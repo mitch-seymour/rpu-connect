@@ -81,7 +81,7 @@ There are several CLIs in the Kafka ecosystem, but `rpk` is extremely powerful ð
 rpk topic create orders -p 4
 ```
 
-## Capturing orders
+## Capturing Orders
 When orders come in, they are written directly to the company's main transactional database: Postgresql. In fact, you can see some orders are already in the database:
 
 ```sh
@@ -125,9 +125,10 @@ rpk topic consume orders
 The command will just hang, waiting for data to flow through the topic. Go ahead and hit `Ctrl + C` to exit.
 
 If you're more of a UI person, you could also hop on over to Redpanda Console and look at the topic. It will be empty.
-[http://localhost:8080/topics/orders](http://localhost:8080/topics/orders).
+[http://localhost:8080/topics/orders](http://localhost:8080/topics/orders). Let's hydrate the topic now by adding a Kafka output.
 
-Let's hydrate the topic now by adding a Kafka output. Open the `connect.yaml` file again and run the following code, which tells Redpanda Connect to send the data to the `orders` topic in our Redpanda cluster.
+### Configuring the Output
+Open the `connect.yaml` file again and run the following code, which tells Redpanda Connect to send the data to the `orders` topic in our Redpanda cluster.
 
 ```yaml
 input:
