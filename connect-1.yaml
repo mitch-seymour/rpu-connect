@@ -1,0 +1,6 @@
+input:
+  sql_select:
+    driver: postgres
+    dsn: postgres://root:secret@postgres:5432/root?sslmode=disable
+    table: orders
+    columns: [ '*' ]

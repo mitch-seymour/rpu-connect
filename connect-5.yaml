@@ -1,0 +1,52 @@
+input:
+  sql_select:
+    driver: postgres
+    dsn: postgres://root:secret@postgres:5432/root?sslmode=disable
+    table: orders
+    columns: [ '*' ]
+
+# add the pipeline
+pipeline:
+  processors:
+    - bloblang: |
+        root = {}
+        root.customer_id = this.customer_id
+        root.order_id = this.order_id
+        root.order_status = this.order_status
+        root.details = this.details
+
+output:
+  label: "redpanda"
+  kafka:
+    addresses: [ 'redpanda-1:9092']
+    topic: orders
+    key: '${! json("customer_id") }'
+
+cache_resources:
+  - label: order_cache
+    memory:
+      default_ttl: 1800s
+
+tests:
+  - name: test record scrubbing
+    environment: {}
+    input_batch:
+      - content: |
+          {
+            "created_at": "2024-12-12T17:25:52.724229Z",
+            "customer_address": "456 Oak Ave",
+            "customer_id": 2,
+            "customer_name": "Jane Smith",
+            "details": "1 pepperoni pizza, 1 veggie pizza",
+            "order_id": 2,
+            "order_status": "delivered"
+          }
+    output_batches:
+      -
+        - json_equals: |
+            {
+              "customer_id": 2,
+              "details": "1 pepperoni pizza, 1 veggie pizza",
+              "order_id": 2,
+              "order_status": "delivered"
+            }

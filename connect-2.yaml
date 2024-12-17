@@ -1,0 +1,13 @@
+input:
+  sql_select:
+    driver: postgres
+    dsn: postgres://root:secret@postgres:5432/root?sslmode=disable
+    table: orders
+    columns: [ '*' ]
+
+output:
+  label: "redpanda"
+  kafka:
+    addresses: [ 'redpanda-1:9092']
+    topic: orders
+    key: '${! json("customer_id") }'

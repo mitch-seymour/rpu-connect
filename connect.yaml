@@ -1,0 +1,168 @@
+input:
+  sql_select:
+    driver: postgres
+    dsn: postgres://root:secret@postgres:5432/root?sslmode=disable
+    table: orders
+    columns: [ '*' ]
+
+# add the pipeline
+pipeline:
+  processors:
+    - for_each:
+      - bloblang: |
+          root = {}
+          root.customer_id = this.customer_id
+          root.order_id = this.order_id
+          root.order_status = this.order_status
+          root.previous_status = this.previous_status
+          root.details = this.details
+
+      # Retrieve the previous status from the cache
+      - branch:
+          processors:
+            # Since cache misses are logged as errors, wrap the cache.get operation in a try/catch
+            # to reduce error log noise
+            - try:
+              - cache:
+                  # lookup the previous status for this order_id in our order_cache resource,
+                  # which is an in-memory map. The in-memory map can be replaced with Redis
+                  # or more durable storage in production
+                  resource: order_cache
+                  operator: get
+                  key: '${! json("order_id") }'
+            - catch:
+              # If the order_id isn't in the cache, set the previous status to "none"
+              - mapping: |
+                  "none"
+          # This part of the branch operator allows us to map the results of this operation
+          # back to the original source message
+          result_map: |
+            root.previous_status = content().string()
+    
+      # Update the cache with the latest order status
+      - cache:
+          resource: order_cache
+          operator: set
+          key: '${! json("order_id") }'
+          value: '${! json("order_status") }'
+
+      # Add some personalization
+      - label: openai
+        branch:
+          request_map: 'if this.previous_status != this.order_status && this.previous_order.status != "none" { this }'
+          processors:
+            - try:
+              -   openai_chat_completion:
+                    server_address: https://api.openai.com/v1
+                    api_key: "${OPENAI_API_KEY}"
+                    model: gpt-4o
+                    system_prompt: |
+                      Our customer just ordered some food and the order status just changed
+                      from to ${! json(this.order_status)}. Please create a personalized message
+                      to give them this update.
+                      Bonus points if you can come up with something witty pertaining to their
+                      order: ${! json(this.details)}.
+            - catch:
+              # If the order_id isn't in the cache, set the previous status to "none"
+              - mapping: |
+                  "Your order is now: " + this.order_status
+          result_map: 'root.message = content().string()'
+
+      # Perform an action if the status has changed
+      - branch:
+          request_map: 'if this.message != null { this }'
+          processors:
+            - log:
+                level: INFO
+                message: |
+                  Send customer update: ${! json("customer_id") }
+                  ${! json("message") }
+
+            # - http:
+            #     url: "http://localhost:8787/api/status-change"
+            #     method: POST
+            #     headers:
+            #       Content-Type: application/json
+            #     payload: |
+            #       {
+            #         "customer_id": this.customer_id,
+            #         "order_id": this.order_id,
+            #         "previous_status": this.previous_status,
+            #         "new_status": this.order_status
+            #       }
+
+output:
+  label: "redpanda"
+  kafka:
+    addresses: [ 'redpanda-1:9092']
+    topic: orders
+    key: '${! json("customer_id") }'
+
+cache_resources:
+  - label: order_cache
+    memory:
+      default_ttl: 1800s
+
+tests:
+  - name: test record scrubbing
+    environment: {}
+    input_batch:
+      - content: |
+          {
+            "created_at": "2024-12-12T17:25:52.724229Z",
+            "customer_address": "456 Oak Ave",
+            "customer_id": 2,
+            "customer_name": "Jane Smith",
+            "details": "1 pepperoni pizza, 1 veggie pizza",
+            "order_id": 2,
+            "order_status": "pending"
+          }
+      - content: |
+          {
+            "created_at": "2024-12-12T17:25:52.724229Z",
+            "customer_address": "456 Oak Ave",
+            "customer_id": 2,
+            "customer_name": "Jane Smith",
+            "details": "1 pepperoni pizza, 1 veggie pizza",
+            "order_id": 2,
+            "order_status": "pending"
+          }
+      - content: |
+          {
+            "created_at": "2024-12-12T17:25:52.724229Z",
+            "customer_address": "456 Oak Ave",
+            "customer_id": 2,
+            "customer_name": "Jane Smith",
+            "details": "1 pepperoni pizza, 1 veggie pizza",
+            "order_id": 2,
+            "order_status": "delivered"
+          }
+    output_batches:
+      -
+        - json_equals: |
+            {
+              "customer_id": 2,
+              "details": "1 pepperoni pizza, 1 veggie pizza",
+              "message": "Your order is now: pending",
+              "order_id": 2,
+              "order_status": "pending",
+              "previous_status": "none"
+            }
+        - json_equals: |
+            {
+              "customer_id": 2,
+              "details": "1 pepperoni pizza, 1 veggie pizza",
+              "message": "",
+              "order_id": 2,
+              "order_status": "pending",
+              "previous_status": "pending"
+            }
+        - json_equals: |
+            {
+              "customer_id": 2,
+              "details": "1 pepperoni pizza, 1 veggie pizza",
+              "message": "Your order is now: delivered",
+              "order_id": 2,
+              "order_status": "delivered",
+              "previous_status": "pending"
+            }
