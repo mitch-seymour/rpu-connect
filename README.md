@@ -1,4 +1,4 @@
-# RP Connect Pizza Tracker
+# Redpanda Connect Pizza Tracker
 
 You just bought a pizza restaurant, nice! You tell people it's because you always wanted to feed the hungry, but really, you just like eating obscene amounts of BBQ chicken pizza when no one's looking.
 
