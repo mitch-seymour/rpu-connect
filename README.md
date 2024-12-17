@@ -37,9 +37,9 @@ An example notification that we may produce from the above record is shown here:
 ```
 
 ## Starting the Services
-There are a few moving parts here, including a database, Redpanda, and Redpanda Connect. But we have already pre-configured these services for you in a Docker compose environment.
+There are a few moving parts required to get our notification service off the ground. Our technical stack includes a database, Redpanda, and Redpanda Connect.
 
-You can start all of the services needed for this tutorial with the following command.
+We have already pre-configured these services for you in a Docker compose environment, and you can start them by running the following command.
 
 ```sh
 docker-compose up -d
