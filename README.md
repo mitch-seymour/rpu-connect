@@ -1,4 +1,4 @@
-# RP Connect Pizza Tracker
+# Redpanda Connect Pizza Tracker
 
 You just bought a pizza restaurant, nice! You tell people it's because you always wanted to feed the hungry, but really, you just like eating obscene amounts of BBQ chicken pizza when no one's looking.
 
@@ -36,9 +36,10 @@ An example notification that we may produce from the above record is shown here:
 }
 ```
 
-There are a few moving parts here, including a database, Redpanda, and Redpanda Connect. But we have already pre-configured these services for you in a Docker compose environment.
+## Starting the Services
+There are a few moving parts required to get our notification service off the ground. Our technical stack includes a database, Redpanda, and Redpanda Connect.
 
-You can start all of the services needed for this tutorial with the following command.
+We have already pre-configured these services for you in a Docker compose environment, and you can start them by running the following command.
 
 ```sh
 docker-compose up -d
@@ -80,7 +81,7 @@ There are several CLIs in the Kafka ecosystem, but `rpk` is extremely powerful ð
 rpk topic create orders -p 4
 ```
 
-## Capturing orders
+## Capturing Orders
 When orders come in, they are written directly to the company's main transactional database: Postgresql. In fact, you can see some orders are already in the database:
 
 ```sh
@@ -124,9 +125,10 @@ rpk topic consume orders
 The command will just hang, waiting for data to flow through the topic. Go ahead and hit `Ctrl + C` to exit.
 
 If you're more of a UI person, you could also hop on over to Redpanda Console and look at the topic. It will be empty.
-[http://localhost:8080/topics/orders](http://localhost:8080/topics/orders).
+[http://localhost:8080/topics/orders](http://localhost:8080/topics/orders). Let's hydrate the topic now by adding a Kafka output.
 
-Let's hydrate the topic now by adding a Kafka output. Open the `connect.yaml` file again and run the following code, which tells Redpanda Connect to send the data to the `orders` topic in our Redpanda cluster.
+### Configuring the Output
+Open the `connect.yaml` file again and run the following code, which tells Redpanda Connect to send the data to the `orders` topic in our Redpanda cluster.
 
 ```yaml
 input:
