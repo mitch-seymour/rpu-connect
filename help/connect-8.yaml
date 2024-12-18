@@ -46,15 +46,6 @@ pipeline:
           key: '${! json("order_id") }'
           value: '${! json("order_status") }'
 
-      # Perform an action if the status has changed
-      - branch:
-          request_map: 'if this.previous_status != this.order_status { this }'
-          processors:
-            - log:
-                level: INFO
-                message: |
-                  Let customer ${! json("customer_id") } know their order is now: ${! json("order_status") }
-
 output:
   label: "redpanda"
   kafka:

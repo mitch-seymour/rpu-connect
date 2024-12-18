@@ -46,41 +46,14 @@ pipeline:
           key: '${! json("order_id") }'
           value: '${! json("order_status") }'
 
-      # Add some personalization
-      - label: openai
-        branch:
-          request_map: 'if this.previous_status != this.order_status && this.previous_order.status != "none" { this }'
-          processors:
-            - try:
-              # Use an external AI model to add personalization our notications
-              -   openai_chat_completion:
-                    server_address: https://api.openai.com/v1
-                    api_key: "${OPENAI_API_KEY}"
-                    model: gpt-4o
-                    # Feel free to adjust this prompt in fun ways. Maybe provide a fun persona
-                    # for OpenAI to use when generating text?
-                    system_prompt: |
-                      Our customer just ordered some food and the order status just changed
-                      from to ${! json(this.order_status)}. Please create a personalized message
-                      to give them this update.
-                      Bonus points if you can come up with something witty pertaining to their
-                      order: ${! json(this.details)}.
-            - catch:
-              # If the order_id isn't in the cache, set the previous status to "none"
-              - mapping: |
-                  "Your order is now: " + this.order_status
-          result_map: 'root.message = content().string()'
-
       # Perform an action if the status has changed
       - branch:
-          request_map: 'if this.message != null { this }'
+          request_map: 'if this.previous_status != this.order_status { this }'
           processors:
             - log:
                 level: INFO
                 message: |
-                  Send customer update: ${! json("customer_id") }
-                  ${! json("message") }
-
+                  Let customer ${! json("customer_id") } know their order is now: ${! json("order_status") }
 
 output:
   label: "redpanda"
